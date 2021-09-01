@@ -8,7 +8,13 @@ from numpy import random
 
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
-from icecream import ic
+
+try:
+    from icecream import ic
+except ImportError:
+    def ic(*args):
+        print("ic: " + str(args))
+        return args
 
 class AbstractEquationSolver:
     fitnessHistory: List[float]

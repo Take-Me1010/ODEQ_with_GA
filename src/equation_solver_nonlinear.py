@@ -9,7 +9,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 
-from icecream import ic
+try:
+    from icecream import ic
+except ImportError:
+    def ic(*args):
+        print("ic: " + str(args))
+        return args
 
 from abstract_solver import AbstractEquationSolver
 
