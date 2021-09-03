@@ -34,32 +34,42 @@ function evaluate(population::Population):: EvaluatedIndividuals
 end
 
 """
-    choice(population)
+    select(population)
 
 最良個体と、ランダムに選ばれた個体を選んで返す。
 """
-function choice(population::Population):: Tuple{Individual, Individual}
-    bestIndex = argmax(evaluate(population))[1]
-    # 最良個体
-    x::Individual = population[bestIndex, :]
-    # ランダム個体。bestIndexを除いたindexからランダムに選ぶ。
-    n_population = size(population)[1]
-    y::Individual = population[rand(setdiff(1:n_population, [bestIndex])), :]
-    return x, y
+function select(population::Population, k::Integer):: Population
+    evaluated = evaluate(population)
+    sorted = population[sortperm(evaluated[:]), :]
+    return sorted[1:k, :]
 end
 
 """
-    crossover(x, y)
+    crossover(dad, mom)
 
-交差した個体を返す。一点交叉。
+交差した個体を返す。2点交叉。
 """
-function crossover(x::Individual, y::Individual):: Individual
+function crossover(dad::Individual, mom::Individual):: Tuple{Individual, Individual}
     # 遺伝子の長さ
-    length = size(x)[1]
+    gl = size(dad)[1]
 
     # 切り取るindex
-    cut = rand(2: length-1)
-    return cat(x[1: cut], y[cut+1: length]; dims=1)
+    cut1 = rand(2:gl-2)
+    cut2 = rand(cut1+1:gl)
+
+    boy = similar(dad)
+    girl = similar(mom)
+
+    boy[1:cut1] = dad[1:cut1]
+    girl[1:cut1] = mom[1:cut1]
+
+    boy[cut1:cut2] = mom[cut1:cut2]
+    girl[cut1:cut2] = dad[cut1:cut2]
+
+    boy[cut2:gl] = mom[cut2:gl]
+    girl[cut2:gl] = dad[cut2:gl]
+
+    return boy, girl
 end
 
 """
@@ -81,17 +91,25 @@ end
 
 次世代を生成して返却する。rateは突然変異の確率。
 """
-function next_generation!(population::Population; rate::Number = 0.01):: Population
-    x, y = choice(population)
-    population[1, :] = x'
-    population[2, :] = y'
-
+function next_generation!(population::Population; rate = 0.01):: Population
     n_population = size(population)[1]
+    k = n_population ÷ 2
 
-    for i in 3:n_population
-        offspring = crossover(x, y)
-        population[i, :] = offspring'
+    population = select(population, k)
+    population = shuffle(population)
+
+    offsprings = similar(population)
+    
+    n_couple = k÷2
+    for i in 1:n_couple
+        dad = population[i, :]
+        mom = population[i+n_couple, :]
+        boy, girl = crossover(dad, mom)
+        offsprings[i, :] = boy'
+        offsprings[i+n_couple, :] = girl'
     end
+
+    population = cat(population, offsprings, dims=1)
 
     population = mutate!(population, rate)
 
@@ -100,27 +118,32 @@ end
 
 
 function main()
-    length = 50
-    n_population = 100
+    length = 10
+    n_population = 12
     mutationRate = 0.01
-    generation = 50
+    generation = 10
+
+    @assert 0 < mutationRate < 1 "rate must be larger than 0 and smaller than 1."
+    @assert n_population % 4 == 0 "n_population must be shown by 4×N where N is Integer."
 
     best_result = length
 
     population:: Population = init(length, n_population)
 
     for i in 1: generation
-        next_generation!(population; rate=mutationRate)
+        population = next_generation!(population; rate=mutationRate)
 
         evaluated = evaluate(population)
 
         println("Generation $(i) ------------")
         print("avg: ")
         println(sum(evaluated) / n_population / best_result)
-        print("max: ")
-        println(maximum(evaluated) / best_result)
+        print("best: ")
+        println(minimum(evaluated) / best_result)
         println("")
     end
+    best = select(population, 1)
+    @show best
 end
 
 main()
